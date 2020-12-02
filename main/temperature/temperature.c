@@ -18,7 +18,7 @@ temperature_reading_t get_temperature_in_c()
     sensor_count = ds18x20_scan_devices(SENSOR_GPIO, addrs, 1);
     if (sensor_count < 1)
     {
-        reading.success = false;
+        reading.success = ESP_FAIL;
         reading.value = 0;
     }
     else
@@ -28,7 +28,7 @@ temperature_reading_t get_temperature_in_c()
             sensor_count = 1;
         }
         ds18x20_measure_and_read_multi(SENSOR_GPIO, addrs, sensor_count, temps);
-        reading.success = true;
+        reading.success = ESP_OK;
         reading.value = (int)temps[0];
     }
     return reading;

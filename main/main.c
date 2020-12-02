@@ -1,8 +1,10 @@
 #include <stdio.h>
-#include "temperature/temperature.h"
-#include "bluetooth/bluetooth.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "temperature/temperature.h"
+#include "bluetooth/bluetooth.h"
+#include "flash/flash.h"
+#include "wifi/wifi.h"
 
 /**
  * Temperature telemetry task. 
@@ -22,6 +24,9 @@ void temperature_telemetry(void *params)
 
 void app_main(void)
 {
-  advertise();
+  init_flash();
+  init_wifi();
+  init_ble();
+
   //xTaskCreate(&temperature_telemetry, "Temperature Telemetry", 2048, "Temperature Telemetry", 2, NULL);
 }

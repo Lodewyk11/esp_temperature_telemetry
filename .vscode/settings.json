@@ -9,6 +9,14 @@
     "*.md": "markdown",
     "*.mdx": "tdx",
     "stdio.h": "c",
-    "typeinfo": "c"
+    "typeinfo": "c",
+    "*.inc": "c",
+    "random": "c",
+    "limits": "c",
+    "chrono": "c",
+    "system_error": "c",
+    "*.ipp": "c",
+    "*.contiki": "c",
+    "*.lwip": "c"
   }
 }
