@@ -1,0 +1,29 @@
+{
+    "ap_list": [
+        {
+            "ssid": "Pretty fly for a WiFi",
+            "channel": 11,
+            "auth_mode": "WIFI_AUTH_WPA2_PSK"
+        },
+        {
+            "ssid": "Pretty fly for a WiFi",
+            "channel": 6,
+            "auth_mode": "WIFI_AUTH_WPA2_PSK"
+        },
+        {
+            "ssid": "AP_809508452",
+            "channel": 1,
+            "auth_mode": "WIFI_AUTH_OPEN"
+        },
+        {
+            "ssid": "VM5767487",
+            "channel": 11,
+            "auth_mode": "WIFI_AUTH_WPA_WPA2_PSK"
+        },
+        {
+            "ssid": "Horizon Wi-Free",
+            "channel": 11,
+            "auth_mode": "WIFI_AUTH_WPA2_ENTERPRISE"
+        }
+    ]
+}

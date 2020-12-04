@@ -17,6 +17,15 @@
     "system_error": "c",
     "*.ipp": "c",
     "*.contiki": "c",
-    "*.lwip": "c"
+    "*.lwip": "c",
+    "optional": "c",
+    "istream": "c",
+    "ostream": "c",
+    "array": "c",
+    "functional": "c",
+    "tuple": "c",
+    "type_traits": "c",
+    "utility": "c",
+    "ratio": "c"
   }
 }

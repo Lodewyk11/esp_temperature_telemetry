@@ -4,105 +4,56 @@
 #include "esp_event.h"
 #include <string.h>
 
-#define DEBUG_LOG "***** DEBUG *****"
 #define LOG_TAG "wifi"
-#define BUFF_SIZE 1024
 
-char ap_str[BUFF_SIZE];
-int scan_result = ESP_FAIL;
+#define DEFAULT_SCAN_LIST_SIZE 5
+#define BUFF_SIZE 200 * DEFAULT_SCAN_LIST_SIZE
+static char ap_json[BUFF_SIZE];
 
-void wifi_scan_all()
+static char *get_auth_mode(int authmode)
 {
-    uint16_t ap_count = 0;
-    wifi_ap_record_t *ap_list;
-    uint8_t i;
-    // char *authmode;
-
-    esp_wifi_scan_get_ap_num(&ap_count);
-    if (ap_count <= 0)
+    char *str = (char *)malloc(100 * sizeof(char));
+    switch (authmode)
     {
-
-        ESP_LOGE(LOG_TAG, "No Wifi networks found");
-        return;
-    }
-
-    ap_list = (wifi_ap_record_t *)malloc(ap_count * sizeof(wifi_ap_record_t));
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_count, ap_list));
-
-    // printf("======================================================================\n");
-    // printf("             SSID             |    RSSI    |           AUTH           \n");
-    // printf("======================================================================\n");
-    ap_str[0] = '\0';
-    char seperator[2] = ",";
-    for (i = 0; i < ap_count; i++)
-    {
-        if (strstr(ap_str, (char*)ap_list[i].ssid) == NULL)
-        {
-
-            if (strlen(ap_str) + strlen(seperator) + strlen((char *)ap_list[i].ssid) <= BUFF_SIZE)
-            {
-                strcat(ap_str, (char *)ap_list[i].ssid);
-                if (strlen(ap_str) + strlen(seperator) + strlen((char *)ap_list[i + 1].ssid) <= BUFF_SIZE && i != (ap_count - 1))
-                {
-                    strcat(ap_str, seperator);
-                }
-            }
-        }
-        // switch (ap_list[i].authmode)
-        // {
-        // case WIFI_AUTH_OPEN:
-        //     authmode = "WIFI_AUTH_OPEN";
-        //     break;
-        // case WIFI_AUTH_WEP:
-        //     authmode = "WIFI_AUTH_WEP";
-        //     break;
-        // case WIFI_AUTH_WPA_PSK:
-        //     authmode = "WIFI_AUTH_WPA_PSK";
-        //     break;
-        // case WIFI_AUTH_WPA2_PSK:
-        //     authmode = "WIFI_AUTH_WPA2_PSK";
-        //     break;
-        // case WIFI_AUTH_WPA_WPA2_PSK:
-        //     authmode = "WIFI_AUTH_WPA_WPA2_PSK";
-        //     break;
-        // default:
-        //     authmode = "Unknown";
-        //     break;
-        // }
-        // printf("%26.26s    |    % 4d    |    %22.22s\n", ap_list[i].ssid, ap_list[i].rssi, authmode);
-    }
-    free(ap_list);
-    scan_result = ESP_OK;
-}
-
-esp_err_t event_handler(void *ctx, system_event_t *event)
-{
-    switch (event->event_id)
-    {
-    case SYSTEM_EVENT_STA_START:
-        ESP_LOGI(LOG_TAG, "SYSTEM_EVENT_STA_START");
+    case WIFI_AUTH_OPEN:
+        strcpy(str, "WIFI_AUTH_OPEN");
         break;
-    case SYSTEM_EVENT_STA_GOT_IP:
-        ESP_LOGI(LOG_TAG, "SYSTEM_EVENT_STA_GOT_IP");
+    case WIFI_AUTH_WEP:
+        strcpy(str, "WIFI_AUTH_WEP");
         break;
-    case SYSTEM_EVENT_STA_DISCONNECTED:
-        ESP_LOGI(LOG_TAG, "SYSTEM_EVENT_STA_DISCONNECTED");
+    case WIFI_AUTH_WPA_PSK:
+        strcpy(str, "WIFI_AUTH_WPA_PSK");
         break;
-    case SYSTEM_EVENT_SCAN_DONE:
-        ESP_LOGI(LOG_TAG, "SYSTEM_EVENT_SCAN_DONE");
-        ESP_ERROR_CHECK(esp_wifi_scan_stop());
-        wifi_scan_all();
+    case WIFI_AUTH_WPA2_PSK:
+        strcpy(str, "WIFI_AUTH_WPA2_PSK");
+        break;
+    case WIFI_AUTH_WPA_WPA2_PSK:
+        strcpy(str, "WIFI_AUTH_WPA_WPA2_PSK");
+        break;
+    case WIFI_AUTH_WPA2_ENTERPRISE:
+        strcpy(str, "WIFI_AUTH_WPA2_ENTERPRISE");
+        break;
+    case WIFI_AUTH_WPA3_PSK:
+        strcpy(str, "WIFI_AUTH_WPA3_PSK");
+        break;
+    case WIFI_AUTH_WPA2_WPA3_PSK:
+        strcpy(str, "WIFI_AUTH_WPA2_WPA3_PSK");
         break;
     default:
+        strcpy(str, "WIFI_AUTH_UNKNOWN");
         break;
     }
-    return ESP_OK;
+    return str;
 }
+
 
 void init_wifi()
 {
-    tcpip_adapter_init();
-    ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL));
+    esp_netif_init();
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
+    assert(sta_netif);
+
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
@@ -110,21 +61,53 @@ void init_wifi()
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
-void scan_for_wifi()
+static void wifi_scan()
 {
-    wifi_scan_config_t scan_config = {
-        .ssid = 0,
-        .bssid = 0,
-        .channel = 0,
-        .scan_type = WIFI_SCAN_TYPE_ACTIVE};
-    ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
-    //invoke callback here
+    uint16_t number = DEFAULT_SCAN_LIST_SIZE;
+    wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE];
+    uint16_t ap_count = 0;
+    memset(ap_info, 0, sizeof(ap_info));
+
+    ESP_ERROR_CHECK(esp_wifi_scan_start(NULL, true));
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&number, ap_info));
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
+
+    memset(ap_json, 0, sizeof(ap_json));
+    strcat(ap_json, "{\"ap_list\":[");
+    for (int i = 0; (i < DEFAULT_SCAN_LIST_SIZE) && (i < ap_count); i++)
+    {
+        strcat(ap_json, "{");
+        strcat(ap_json, "\"ssid\": \"");
+        strcat(ap_json, (char *)ap_info[i].ssid);
+        strcat(ap_json, "\",");
+
+        char *str = (char *)malloc(100 * sizeof(char));
+        strcat(ap_json, "\"channel\": ");
+        sprintf(str, "%d", ap_info[i].primary);
+        strcat(ap_json, str);
+        strcat(ap_json, ",");
+
+        free(str);
+
+        strcat(ap_json, "\"auth_mode\": \"");
+        char *auth_mode = get_auth_mode(ap_info[i].authmode);
+        strcat(ap_json, auth_mode);
+        strcat(ap_json, "\"");
+        free(auth_mode);
+
+        strcat(ap_json, "}");
+        if (i != ap_count - 1 && i != DEFAULT_SCAN_LIST_SIZE - 1)
+        {
+            strcat(ap_json, ",");
+        }
+    }
+    strcat(ap_json, "]}");
 }
 
-wifi_ap_scan_t get_aps()
+char* get_aps_json()
 {
-    wifi_ap_scan_t scan_results = {
-        .success = scan_result,
-        .value = ap_str};
-    return scan_results;
+    wifi_scan();
+    char *str = (char *)malloc(BUFF_SIZE * sizeof(char));
+    strcpy(str, ap_json);
+    return str;
 }

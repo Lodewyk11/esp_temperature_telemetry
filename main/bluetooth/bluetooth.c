@@ -276,6 +276,8 @@ void init_ble()
     ESP_ERROR_CHECK(esp_nimble_hci_and_controller_init());
     nimble_port_init();
 
+
+    ESP_LOGE("***** DEBUG *****", "Initializing BLE");
     //Initialize NimBLE host configuration.
     ble_hs_cfg.reset_cb = on_reset;
     ble_hs_cfg.sync_cb = on_sync;
@@ -287,6 +289,7 @@ void init_ble()
     ble_hs_cfg.sm_their_key_dist = 1;
     ble_hs_cfg.sm_sc = 1;
     ble_hs_cfg.sm_mitm = 1;
+    ble_svc_gap_init();
     
     rc = gatt_server_init();
     assert(rc == ESP_OK);
