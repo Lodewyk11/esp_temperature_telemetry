@@ -38,12 +38,21 @@ static const ble_uuid128_t get_scan_result_chr_uuid =
     BLE_UUID128_INIT(0xf7, 0x6d, 0xc9, 0x07, 0x71, 0x00, 0x16, 0xb0,
                      0xe1, 0x45, 0x7e, 0x89, 0x9e, 0x65, 0x7e, 0xb0);
 
+/* b07e659e-897e-45e1-b016-007107c96df7 */
+static const ble_uuid128_t connect_to_wifi_chr_uuid =
+    BLE_UUID128_INIT(0x1d, 0x4e, 0xc9, 0x07, 0x71, 0x00, 0x16, 0xc8,
+                     0xe1, 0x45, 0x7e, 0x89, 0x9e, 0x65, 0x7e, 0xb0);
+
+/* b07e659e-897e-45e1-b016-007107c96df7 */
+static const ble_uuid128_t get_wifi_conn_status_chr_uuid =
+    BLE_UUID128_INIT(0x1d, 0x5f, 0xc9, 0xf7, 0x71, 0x01, 0x16, 0xc8,
+                     0xe1, 0x45, 0x7e, 0x89, 0x9e, 0x65, 0x7e, 0xb0);
+
 static int handle_wifi_ops(uint16_t conn_handle, uint16_t attr_handle,
-                         struct ble_gatt_access_ctxt *ctxt,
-                         void *arg);
+                           struct ble_gatt_access_ctxt *ctxt,
+                           void *arg);
 
-
-static char * ap_json;
+static char *ap_json;
 
 int scanned = 0;
 
@@ -56,9 +65,17 @@ static const struct ble_gatt_svc_def services[] = {
             {/*** Characteristic: Scan Wifi APs. */
              .uuid = &scan_wifi_aps_chr_uuid.u,
              .access_cb = handle_wifi_ops,
-             .flags = BLE_GATT_CHR_F_READ},
+             .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_READ_ENC},
             {/*** Characteristic: Get scan results. */
              .uuid = &get_scan_result_chr_uuid.u,
+             .access_cb = handle_wifi_ops,
+             .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_READ_ENC},
+            {/*** Characteristic: Connect to WiFi AP. */
+             .uuid = &connect_to_wifi_chr_uuid.u,
+             .access_cb = handle_wifi_ops,
+             .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_ENC},
+            {/*** Characteristic: Get WiFi Connection Status. */
+             .uuid = &get_wifi_conn_status_chr_uuid.u,
              .access_cb = handle_wifi_ops,
              .flags = BLE_GATT_CHR_F_READ},
             {
@@ -93,39 +110,42 @@ static const struct ble_gatt_svc_def services[] = {
 // }
 
 static int handle_wifi_ops(uint16_t conn_handle, uint16_t attr_handle,
-                        struct ble_gatt_access_ctxt *ctxt,
-                        void *arg)
+                           struct ble_gatt_access_ctxt *ctxt,
+                           void *arg)
 
-{   
+{
     const ble_uuid_t *uuid;
     uuid = ctxt->chr->uuid;
     int rc;
     if (ble_uuid_cmp(uuid, &scan_wifi_aps_chr_uuid.u) == 0)
     {
-       
+
         switch (ctxt->op)
         {
         case BLE_GATT_ACCESS_OP_READ_CHR:;
             ESP_LOGI(DEGUG_LOG, "Scanning...");
             ap_json = get_aps_json();
             ESP_LOGI(DEGUG_LOG, "Result: %s", ap_json);
-            rc = os_mbuf_append(ctxt->om, "SCAN_COMPLETE", strlen("SCAN_COMPLETE") * sizeof(char));
+            rc = os_mbuf_append(ctxt->om, "{\"status\": 200, \"data\": \"SCAN_COMPLETE\"}", strlen("{\"status\": 200, \"data\": \"SCAN_COMPLETE\"}") * sizeof(char));
             scanned = 1;
             return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
         default:
             assert(0);
             return BLE_ATT_ERR_UNLIKELY;
         }
-    } else if (ble_uuid_cmp(uuid, &get_scan_result_chr_uuid.u) == 0)
+    }
+    else if (ble_uuid_cmp(uuid, &get_scan_result_chr_uuid.u) == 0)
     {
         switch (ctxt->op)
         {
-        case BLE_GATT_ACCESS_OP_READ_CHR:
-            ;
-            if(scanned == 1) {
+        case BLE_GATT_ACCESS_OP_READ_CHR:;
+            if (scanned == 1)
+            {
                 rc = os_mbuf_append(ctxt->om, ap_json, strlen(ap_json) * sizeof(char));
                 return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
-            } else {
+            }
+            else
+            {
                 rc = os_mbuf_append(ctxt->om, "Please scan first", strlen("Please scan first") * sizeof(char));
             }
             return BLE_ATT_ERR_INSUFFICIENT_RES;
@@ -134,19 +154,20 @@ static int handle_wifi_ops(uint16_t conn_handle, uint16_t attr_handle,
             return BLE_ATT_ERR_UNLIKELY;
         }
     }
-    assert(0);
-    return 0;
-}
-
-static int get_scan_result(uint16_t conn_handle, uint16_t attr_handle,
-                        struct ble_gatt_access_ctxt *ctxt,
-                        void *arg)
-
-{
-    const ble_uuid_t *uuid;
-    uuid = ctxt->chr->uuid;
-    int rc;
-    
+    else if (ble_uuid_cmp(uuid, &connect_to_wifi_chr_uuid.u) == 0)
+    {
+        ESP_LOGE(DEGUG_LOG, "Connecting to AP");
+        char *ssid = "Pretty fly for a WiFi";
+        char *password = "!!4saken3D!!";
+        int channel = 6;
+        connect_to_ap(ssid, channel, password);
+        return 0;
+    }
+    else if (ble_uuid_cmp(uuid, &get_wifi_conn_status_chr_uuid.u) == 0)
+    {
+        ESP_LOGE(DEGUG_LOG, "Getting conn status");
+        return 0;
+    }
     assert(0);
     return 0;
 }

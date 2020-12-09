@@ -24,9 +24,12 @@ void temperature_telemetry(void *params)
 
 void app_main(void)
 {
+  
   init_flash();
   init_ble();
   init_wifi();
+  
+    
 
   //xTaskCreate(&temperature_telemetry, "Temperature Telemetry", 2048, "Temperature Telemetry", 2, NULL);
 }
