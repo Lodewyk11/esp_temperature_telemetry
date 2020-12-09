@@ -24,7 +24,7 @@ static int8_t do_connect = 0;
 
 static char *get_auth_mode(int authmode)
 {
-    char *str = (char *)malloc(100 * sizeof(char));
+    char *str = (char *)malloc(30 * sizeof(char));
     switch (authmode)
     {
     case WIFI_AUTH_OPEN:

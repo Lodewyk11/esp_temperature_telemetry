@@ -11,7 +11,7 @@
 #include "../wifi/wifi.h"
 #include "esp_log.h"
 
-#define DEGUG_LOG "******* DEBUG ******"
+#define DEBUG_LOG "******* DEBUG ******"
 
 /**
  * The vendor specific security test service consists of two characteristics:
@@ -88,26 +88,27 @@ static const struct ble_gatt_svc_def services[] = {
     },
 };
 
-// static int process_write(struct os_mbuf *om, uint16_t max_len,
-//                          void *dst, uint16_t *len)
-// {
-//     uint16_t om_len;
-//     int rc;
-//     om_len = OS_MBUF_PKTLEN(om);
-//     if (om_len > max_len)
-//     {
-//         return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
-//     }
+static int process_write(struct os_mbuf *om, uint16_t max_len,
+                         void *dst, uint16_t *len)
+{
+    uint16_t om_len;
+    int rc;
+    om_len = OS_MBUF_PKTLEN(om);
+    ESP_LOGI(DEBUG_LOG, "Process write JSON: %s", om->om_data);
+    if (om_len > max_len)
+    {
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+    }
 
-//     rc = ble_hs_mbuf_to_flat(om, dst, max_len, len);
-//     if (rc != 0)
-//     {
-//         return BLE_ATT_ERR_UNLIKELY;
-//     }
-//     printf(dst);
+    rc = ble_hs_mbuf_to_flat(om, dst, max_len, len);
+    if (rc != 0)
+    {
+        return BLE_ATT_ERR_UNLIKELY;
+    }
+    printf(dst);
 
-//     return 0;
-// }
+    return 0;
+}
 
 static int handle_wifi_ops(uint16_t conn_handle, uint16_t attr_handle,
                            struct ble_gatt_access_ctxt *ctxt,
@@ -123,9 +124,9 @@ static int handle_wifi_ops(uint16_t conn_handle, uint16_t attr_handle,
         switch (ctxt->op)
         {
         case BLE_GATT_ACCESS_OP_READ_CHR:;
-            ESP_LOGI(DEGUG_LOG, "Scanning...");
+            ESP_LOGI(DEBUG_LOG, "Scanning...");
             ap_json = get_aps_json();
-            ESP_LOGI(DEGUG_LOG, "Result: %s", ap_json);
+            ESP_LOGI(DEBUG_LOG, "Result: %s", ap_json);
             rc = os_mbuf_append(ctxt->om, "{\"status\": 200, \"data\": \"SCAN_COMPLETE\"}", strlen("{\"status\": 200, \"data\": \"SCAN_COMPLETE\"}") * sizeof(char));
             scanned = 1;
             return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
@@ -156,16 +157,28 @@ static int handle_wifi_ops(uint16_t conn_handle, uint16_t attr_handle,
     }
     else if (ble_uuid_cmp(uuid, &connect_to_wifi_chr_uuid.u) == 0)
     {
-        ESP_LOGE(DEGUG_LOG, "Connecting to AP");
-        char *ssid = "Pretty fly for a WiFi";
-        char *password = "!!4saken3D!!";
-        int channel = 6;
-        connect_to_ap(ssid, channel, password);
+        switch (ctxt->op)
+        {
+        case BLE_GATT_ACCESS_OP_WRITE_CHR:;
+            char *ap_connect_json = (char *)malloc(30 * sizeof(char));
+            printf("BLE_GATT_ACCESS_OP_WRITE_CHR: Figuring out what to do here\n");
+            rc = process_write(ctxt->om,
+                               sizeof ap_connect_json,
+                               &ap_connect_json, NULL);
+            ESP_LOGI(DEBUG_LOG, "Connect JSON: %s", ap_connect_json);
+
+            char *ssid = "";
+            char *password = "";
+            uint8_t channel = 1;
+            //connect_to_ap(ssid, channel, password);
+            return 0;
+        }
+        assert(0);
         return 0;
     }
     else if (ble_uuid_cmp(uuid, &get_wifi_conn_status_chr_uuid.u) == 0)
     {
-        ESP_LOGE(DEGUG_LOG, "Getting conn status");
+        ESP_LOGE(DEBUG_LOG, "Getting conn status");
         return 0;
     }
     assert(0);
@@ -245,10 +258,10 @@ void gatt_server_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg)
 int gatt_server_init(void)
 {
     int rc;
-    ESP_LOGE(DEGUG_LOG, "Initializing GATT server");
+    ESP_LOGE(DEBUG_LOG, "Initializing GATT server");
     ble_svc_gatt_init();
 
-    ESP_LOGE(DEGUG_LOG, "Registering services");
+    ESP_LOGE(DEBUG_LOG, "Registering services");
     rc = ble_gatts_count_cfg(services);
     if (rc != 0)
     {
