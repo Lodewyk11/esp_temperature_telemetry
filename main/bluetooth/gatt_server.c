@@ -10,6 +10,7 @@
 #include "gatt_server.h"
 #include "../wifi/wifi.h"
 #include "esp_log.h"
+#include "cJSON.h"
 
 #define DEBUG_LOG "******* DEBUG ******"
 
@@ -127,8 +128,14 @@ static int handle_wifi_ops(uint16_t conn_handle, uint16_t attr_handle,
             ESP_LOGI(DEBUG_LOG, "Scanning...");
             ap_json = get_aps_json();
             ESP_LOGI(DEBUG_LOG, "Result: %s", ap_json);
-            rc = os_mbuf_append(ctxt->om, "{\"status\": 200, \"data\": \"SCAN_COMPLETE\"}", strlen("{\"status\": 200, \"data\": \"SCAN_COMPLETE\"}") * sizeof(char));
+            cJSON *response_root;
+            response_root = cJSON_CreateObject();
+            cJSON_AddStringToObject(response_root, "data", "SCAN_COMPLETE");
+            cJSON_AddNumberToObject(response_root, "status", 200);
+            char* resp_str = cJSON_PrintUnformatted(response_root);
+            rc = os_mbuf_append(ctxt->om, resp_str, strlen(resp_str) * sizeof(char));
             scanned = 1;
+            free(resp_str);
             return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
         default:
             assert(0);

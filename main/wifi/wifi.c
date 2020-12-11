@@ -7,14 +7,14 @@
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "nvs_flash.h"
+#include "cJSON.h"
 
 #define LOG_TAG "wifi"
 #define DEBUG_LOG "***** DEBUG *****"
 
 #define DEFAULT_SCAN_LIST_SIZE 5
-#define BUFF_SIZE 200 * DEFAULT_SCAN_LIST_SIZE
 
-static char ap_json[BUFF_SIZE];
+static char* ap_json;;
 
 xSemaphoreHandle connectionSemaphore;
 xSemaphoreHandle scanningSemaphore;
@@ -76,36 +76,22 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
             ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&number, ap_info));
             ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
 
-            memset(ap_json, 0, sizeof(ap_json));
-            strcat(ap_json, "{\"ap_list\":[");
+            cJSON *resp_root, *ap_list_arr;
+            resp_root = cJSON_CreateObject();
+            ap_list_arr = cJSON_CreateArray();
+            
             for (int i = 0; (i < DEFAULT_SCAN_LIST_SIZE) && (i < ap_count); i++)
-            {
-                strcat(ap_json, "{");
-                strcat(ap_json, "\"ssid\": \"");
-                strcat(ap_json, (char *)ap_info[i].ssid);
-                strcat(ap_json, "\",");
-
-                char *str = (char *)malloc(100 * sizeof(char));
-                strcat(ap_json, "\"channel\": ");
-                sprintf(str, "%d", ap_info[i].primary);
-                strcat(ap_json, str);
-                strcat(ap_json, ",");
-
-                free(str);
-
-                strcat(ap_json, "\"auth_mode\": \"");
+            {   
+                cJSON *ap_object = cJSON_CreateObject();
+                cJSON_AddStringToObject(ap_object, "ssid",(char *)ap_info[i].ssid);
+                cJSON_AddNumberToObject(ap_object, "channel", ap_info[i].primary);
                 char *auth_mode = get_auth_mode(ap_info[i].authmode);
-                strcat(ap_json, auth_mode);
-                strcat(ap_json, "\"");
-                free(auth_mode);
+                cJSON_AddStringToObject(ap_object, "auth_mode", auth_mode);
 
-                strcat(ap_json, "}");
-                if (i != ap_count - 1 && i != DEFAULT_SCAN_LIST_SIZE - 1)
-                {
-                    strcat(ap_json, ",");
-                }
+                cJSON_AddItemToArray(ap_list_arr, ap_object);
             }
-            strcat(ap_json, "]}");
+            cJSON_AddItemToObject(resp_root, "ap_list", ap_list_arr);
+            ap_json = cJSON_PrintUnformatted(resp_root);
             break;
         case WIFI_EVENT_SCAN_DONE:
             xSemaphoreGive(scanningSemaphore);
@@ -212,7 +198,7 @@ char *get_aps_json()
             break;
         }
     }
-    char *str = (char *)malloc(BUFF_SIZE * sizeof(char));
+    char *str = (char *)malloc(strlen(ap_json) * sizeof(char));
     strcpy(str, ap_json);
     return str;
 }
